@@ -1,4 +1,4 @@
-"""Entry point to run full stroke prediction pipeline aligned with glucose variability study."""
+"""Entry point to run full stroke prediction pipeline with robust evaluation."""
 
 from __future__ import annotations
 
@@ -8,14 +8,15 @@ from sklearn.model_selection import train_test_split
 
 from .config import DATA_PATH, MODELS_DIR, RANDOM_STATE
 from .data_preprocessing import (
-    add_glucose_variability_features,
-    filter_diabetic_patients,
     build_preprocessor,
     drop_irrelevant_columns,
+    enrich_with_available_glucose_history,
+    filter_diabetic_patients,
     load_dataset,
     split_features_target,
 )
 from .eda import (
+    plot_calibration_curve,
     plot_correlation_heatmap,
     plot_feature_importance,
     plot_stroke_distribution,
@@ -39,9 +40,11 @@ def _extract_feature_importance(best_pipeline):
     return feature_names, importances
 
 
-def run_training() -> None:
+def run_training(
+    threshold_strategy: str = "max_f1",
+    min_precision: float = 0.20,
+) -> None:
     """Run end-to-end train, evaluate, compare, and save workflow."""
-
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
     if not Path(DATA_PATH).exists():
@@ -50,28 +53,22 @@ def run_training() -> None:
             "Place Kaggle CSV in data/healthcare-dataset-stroke-data.csv"
         )
 
-    # 1️⃣ Load dataset
+    # 1) Load and deterministically prepare dataset
     df = load_dataset(str(DATA_PATH))
-
-    # 2️⃣ Add glucose variability features (core concept)
-    df = add_glucose_variability_features(df, random_state=RANDOM_STATE)
-
-    # 3️⃣ Restrict to diabetic cohort (base paper alignment)
+    df = enrich_with_available_glucose_history(df)
     df = filter_diabetic_patients(df)
-
-    # 4️⃣ Drop unnecessary columns
     df = drop_irrelevant_columns(df)
 
-    # 5️⃣ EDA
+    # 2) EDA plots
     plot_stroke_distribution(df)
     plot_correlation_heatmap(df)
 
-    # 6️⃣ Split features and target
+    # 3) Split features and target
     X, y = split_features_target(df, target_col="stroke")
     preprocessor = build_preprocessor(X)
 
-    # 7️⃣ Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(
+    # 4) True untouched holdout split
+    X_train, X_holdout, y_train, y_holdout = train_test_split(
         X,
         y,
         test_size=0.20,
@@ -79,34 +76,45 @@ def run_training() -> None:
         stratify=y,
     )
 
-    # 8️⃣ Train and tune models
+    # 5) Train, tune threshold, and evaluate
     best_artifact, comparison_df = train_and_tune_models(
         preprocessor=preprocessor,
         X_train=X_train,
         y_train=y_train,
-        X_test=X_test,
-        y_test=y_test,
+        X_holdout=X_holdout,
+        y_holdout=y_holdout,
+        threshold_strategy=threshold_strategy,
+        min_precision=min_precision,
     )
 
-    # 9️⃣ Save best model
+    # 6) Save best model
     save_best_model(best_artifact.best_estimator)
 
-    # 🔟 Feature importance
-    feature_names, importances = _extract_feature_importance(
-        best_pipeline=best_artifact.best_estimator
-    )
-
+    # 7) Feature importance and calibration plots
+    feature_names, importances = _extract_feature_importance(best_artifact.best_estimator)
     if feature_names is not None:
         plot_feature_importance(feature_names, importances)
+    plot_calibration_curve(y_holdout.to_numpy(), best_artifact.holdout_proba, n_bins=10)
 
     print("\nModel Comparison:")
     print(comparison_df.to_string(index=False))
 
-    print(f"\nBest Model (by stroke-class recall): {best_artifact.name}")
-    print("Best Model Metrics:")
+    print(f"\nBest Model: {best_artifact.name}")
+    print(f"Decision Threshold: {best_artifact.threshold:.3f} ({best_artifact.threshold_strategy})")
 
-    for metric_name, metric_value in best_artifact.metrics.items():
-        print(f"- {metric_name}: {metric_value}")
+    print("\nHoldout Metrics:")
+    for metric_name, metric_value in best_artifact.holdout_metrics.items():
+        if metric_name == "confusion_matrix":
+            print(f"- {metric_name}: {metric_value}")
+        else:
+            print(f"- {metric_name}: {metric_value:.6f}" if isinstance(metric_value, float) else f"- {metric_name}: {metric_value}")
+
+    print("\nRepeated CV Summary (mean, 95% CI):")
+    for metric_name, summary in best_artifact.cv_summary.items():
+        print(
+            f"- {metric_name}: {summary['mean']:.4f} "
+            f"(95% CI {summary['ci_low']:.4f} to {summary['ci_high']:.4f})"
+        )
 
 
 if __name__ == "__main__":
