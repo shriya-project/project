@@ -1,85 +1,106 @@
-# Prediction Analysis for Stroke Risk in Genetically Predisposed Diabetic Patients
+# Stroke Risk Prediction (Deterministic + Threshold-Tuned)
 
-Complete machine learning project in Python using the Kaggle Healthcare Stroke Dataset.
+This project predicts stroke risk in a diabetic cohort using the Kaggle Healthcare Stroke Dataset and a Streamlit interface.
+
+The pipeline now uses:
+- deterministic preprocessing (no random feature simulation)
+- repeated stratified cross-validation with confidence intervals
+- a true untouched holdout set for final reporting
+- decision-threshold tuning (not fixed at 0.5)
+- richer metrics (PR-AUC, sensitivity, specificity, Brier score, calibration curve)
+- explainability in app (top factors, optional SHAP)
 
 ## Project Structure
 
 ```text
-stroke_prediction_project/
-├── app/
-│   └── streamlit_app.py
-├── data/
-│   └── healthcare-dataset-stroke-data.csv   # place Kaggle CSV here
-├── models/
-│   ├── best_model.joblib                    # generated after training
-│   ├── model_comparison.csv                 # generated after training
-│   └── *.png                                # generated plots
-├── notebooks/
-├── src/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── data_preprocessing.py
-│   ├── eda.py
-│   ├── modeling.py
-│   └── train.py
-└── requirements.txt
+project/
+  app/
+    streamlit_app.py
+  data/
+    healthcare-dataset-stroke-data.csv
+  models/
+    best_model.joblib
+    model_metadata.json
+    model_comparison.csv
+    cv_results.csv
+    holdout_metrics.csv
+    feature_importance.csv
+    stroke_distribution.png
+    correlation_heatmap.png
+    feature_importance.png
+    calibration_curve.png
+  src/
+    config.py
+    data_preprocessing.py
+    eda.py
+    modeling.py
+    train.py
+  requirements.txt
 ```
 
 ## Setup
-
-1. Create and activate a virtual environment.
-2. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Download the Kaggle Healthcare Stroke Dataset CSV and place it at:
+Place dataset at:
 
 `data/healthcare-dataset-stroke-data.csv`
 
-## Train Pipeline
-
-Run from project root (`stroke_prediction_project`):
+## Train
 
 ```bash
 python -m src.train
 ```
 
-This performs:
-- Missing value handling via imputers
-- Dropping irrelevant column (`id`)
-- One-hot encoding categorical features
-- Scaling numeric features
-- Synthetic `family_history` feature generation:
-  - 30% probability of value 1
-  - +5% synthetic stroke probability adjustment for `family_history=1`
-- EDA plots:
-  - Stroke class distribution
-  - Correlation heatmap
-  - Feature importance plot (best model)
-- Train/test split (80/20)
-- SMOTE balancing on training data
-- Model training and GridSearchCV tuning:
-  - Logistic Regression
-  - Random Forest
-  - XGBoost (if installed)
-- Evaluation metrics:
-  - Accuracy
-  - Precision
-  - Recall
-  - F1-score
-  - ROC-AUC
-  - Confusion Matrix
-- Best model selection by recall for stroke class (class `1`)
-- Model saving with `joblib` to `models/best_model.joblib`
+Training flow:
+1. Load dataset and deterministic preprocessing.
+2. Keep diabetic cohort (`is_diabetic` based on glucose threshold).
+3. Split into development set and untouched holdout set.
+4. Hyperparameter tuning with CV.
+5. Threshold tuning (`max_f1` or `recall_at_precision`) on training data.
+6. Repeated stratified CV metrics + 95% confidence intervals.
+7. Final holdout evaluation and artifact export.
 
-## Optional Streamlit App
-
-After training:
+## Run App
 
 ```bash
 streamlit run app/streamlit_app.py
 ```
 
-The app loads `models/best_model.joblib` and predicts stroke risk for user inputs.
+App highlights:
+- asks user for explicit glucose history summary (mean, SD, CV)
+- deterministic prediction for same input
+- threshold-aware risk label
+- uncertainty messaging based on distance to threshold
+- local top factors and optional SHAP view
+- downloadable PDF report
+
+## Output Metrics
+
+Artifacts in `models/` include:
+- `model_comparison.csv`: model-level comparison
+- `cv_results.csv`: fold-level repeated CV results
+- `holdout_metrics.csv`: untouched holdout metrics
+- `model_metadata.json`: threshold and metric metadata used by app
+
+Reported metrics include:
+- accuracy
+- balanced accuracy
+- precision
+- recall (sensitivity)
+- specificity
+- F1-score
+- ROC-AUC
+- PR-AUC
+- Brier score
+- confusion matrix
+
+## Clinical Limitations and Disclaimer
+
+- This project is for educational and research use.
+- It is not validated for clinical deployment.
+- Dataset is retrospective and may not generalize across populations.
+- Predictions must not replace clinician judgment or diagnostic workflow.
+- Any practical use requires clinical validation, governance, and regulatory review.

@@ -11,8 +11,12 @@ MODELS_DIR = BASE_DIR / "models"
 DATA_PATH = DATA_DIR / "healthcare-dataset-stroke-data.csv"
 BEST_MODEL_PATH = MODELS_DIR / "best_model.joblib"
 COMPARISON_PATH = MODELS_DIR / "model_comparison.csv"
+METADATA_PATH = MODELS_DIR / "model_metadata.json"
+CV_RESULTS_PATH = MODELS_DIR / "cv_results.csv"
+HOLDOUT_METRICS_PATH = MODELS_DIR / "holdout_metrics.csv"
 
 PLOT_STROKE_DIST_PATH = MODELS_DIR / "stroke_distribution.png"
 PLOT_CORR_HEATMAP_PATH = MODELS_DIR / "correlation_heatmap.png"
 PLOT_FEATURE_IMPORTANCE_PATH = MODELS_DIR / "feature_importance.png"
+PLOT_CALIBRATION_CURVE_PATH = MODELS_DIR / "calibration_curve.png"
 

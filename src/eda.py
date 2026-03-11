@@ -5,8 +5,10 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from sklearn.calibration import calibration_curve
 
 from .config import (
+    PLOT_CALIBRATION_CURVE_PATH,
     PLOT_CORR_HEATMAP_PATH,
     PLOT_FEATURE_IMPORTANCE_PATH,
     PLOT_STROKE_DIST_PATH,
@@ -50,5 +52,21 @@ def plot_feature_importance(feature_names, importances) -> None:
     plt.ylabel("Feature")
     plt.tight_layout()
     plt.savefig(PLOT_FEATURE_IMPORTANCE_PATH, dpi=200)
+    plt.close()
+
+
+def plot_calibration_curve(y_true, y_proba, n_bins: int = 10) -> None:
+    """Plot and save calibration curve for holdout predictions."""
+    prob_true, prob_pred = calibration_curve(y_true, y_proba, n_bins=n_bins, strategy="quantile")
+
+    plt.figure(figsize=(6, 5))
+    plt.plot(prob_pred, prob_true, marker="o", linewidth=2, label="Model")
+    plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
+    plt.xlabel("Mean Predicted Probability")
+    plt.ylabel("Observed Positive Rate")
+    plt.title("Calibration Curve (Holdout)")
+    plt.legend(loc="best")
+    plt.tight_layout()
+    plt.savefig(PLOT_CALIBRATION_CURVE_PATH, dpi=200)
     plt.close()
 
