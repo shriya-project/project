@@ -1,0 +1,2 @@
+"""Stroke prediction project package."""
+

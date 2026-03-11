@@ -1,0 +1,3 @@
+model,best_params,accuracy,precision,recall,f1_score,roc_auc
+Logistic Regression,"{'model__C': 0.1, 'model__class_weight': None, 'model__solver': 'liblinear'}",0.6487804878048781,0.1728395061728395,0.7368421052631579,0.28,0.7591963780418789
+Random Forest,"{'model__class_weight': None, 'model__max_depth': 8, 'model__min_samples_split': 10, 'model__n_estimators': 200}",0.8439024390243902,0.21739130434782608,0.2631578947368421,0.23809523809523808,0.7719298245614035
